@@ -62,6 +62,9 @@
   control + shift + tab : 转向上一个标签页  
   command + +/= : 放大页面  
   command + - : 缩小页面  
+  command + [ : show the previous page  
+  command + ] : show the next page  
+  
 
 ## sublime3
 - ctrl + alt + o: preview markup in browser
