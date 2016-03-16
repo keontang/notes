@@ -64,7 +64,10 @@
   command + - : 缩小页面  
   command + [ : show the previous page  
   command + ] : show the next page  
-  
+
+7. dictionary  
+  aption + esc : 单词发音  
+    
 
 ## sublime3
 - ctrl + alt + o: preview markup in browser
