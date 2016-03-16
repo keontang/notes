@@ -86,4 +86,7 @@ git config --global core.editor vim
 - 将本地所有分支都推送到远程仓库
 
 ---
-    git push --all repo_name
+    git push --all repo_name  
+
+## 参考  
+[Git远程操作详解](http://www.ruanyifeng.com/blog/2014/06/git_remote.html)
