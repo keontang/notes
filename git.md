@@ -90,3 +90,8 @@ git config --global core.editor vim
 
 ## 参考  
 [Git远程操作详解](http://www.ruanyifeng.com/blog/2014/06/git_remote.html)
+
+## github 详解  
+[GotGitHub](http://www.worldhello.net/gotgithub/index.html)  
+
+

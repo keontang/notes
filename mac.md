@@ -14,6 +14,8 @@
   command + a : 全选  
   command + s : 保存  
   command + f : 查找  
+  fn + f11 : 快速切换到桌面  
+  command + m : 最小化当前程序
 
 2. 截图  
   command + shift + 4 : 截取所选屏幕区域到一个文件  
@@ -43,6 +45,8 @@
   option + 右箭头 : 将光标移至下一个单词的末尾  
   option + 左箭头 : 将光标移至下一个箭头的开头  
   control + a : 移至行或段落的开头  
+  control + space : 输入法切换  
+    另外，中文输入法模式下，点击caps lock可以输入小写英文，若是还想输入大写英文字母，就还要按住shift打字
 
 5. Finder中  
   command + option + v : 剪切文件  
@@ -66,8 +70,9 @@
   command + ] : show the next page  
 
 7. dictionary  
-  aption + esc : 单词发音  
-    
+  option + esc : 单词发音  
+  control + command + d: 屏幕取词 
 
 ## sublime3
 - ctrl + alt + o: preview markup in browser
+
