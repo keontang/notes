@@ -89,9 +89,11 @@ git config --global core.editor vim
     git push --all repo_name  
 
 ## 参考  
-[Git远程操作详解](http://www.ruanyifeng.com/blog/2014/06/git_remote.html)
+1. [Git远程操作详解](http://www.ruanyifeng.com/blog/2014/06/git_remote.html)
 
 ## github 详解  
-[GotGitHub](http://www.worldhello.net/gotgithub/index.html)  
+1. [GotGitHub](http://www.worldhello.net/gotgithub/index.html)  
+2. [git笔记](https://pylemons-note.readthedocs.org/en/latest/git.html)  
+
 
 

@@ -16,6 +16,6 @@ for Repo in $* ; do
     sed -e "s/^/${Repo}:/"
 done
 
-curl https://registry.hub.docker.com/v2/repositories/ubuntu/tags | python -mjson.tool
+curl https://registry.hub.docker.com/v2/repositories/library/ubuntu/tags | python -mjson.tool
 
-
+install docker: curl -sSL https://get.docker.com/ | sh
