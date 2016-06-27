@@ -25,8 +25,15 @@ wlan0     IEEE 802.11abgn
           Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
           Tx excessive retries:0  Invalid misc:10   Missed beacon:0
 ```
-添加wifi网络ID和密码，让系统启动时自动连接wifi:  
+添加wifi网络ID和密码，让每次系统启动时自动连接wifi:  
 ```sh
+root@ubuntu-server-1:/home/caicloud# cat /etc/wpa_supplicant/wpa_supplicant.conf
+ctrl_interface=/var/run/wpa_supplicant
+
+network={
+    ssid="XXXX"
+    psk="XXXX"
+}
 root@ubuntu-server-1:/home/caicloud# cat /etc/network/interfaces
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
@@ -40,11 +47,17 @@ auto p2p1
 iface p2p1 inet dhcp
 
 auto wlan0
+allow-hotplug wlan0
 iface wlan0 inet dhcp
-wpa-ssid xxxx
-wpa-psk xxxx
+############################
+#wpa-ssid xxxx
+#wpa-psk xxxx
+# 注: #如果按照如上方式的话，启动的时候会报错:
+# Failed to connect to non-global ctrl_ifname: wlan0  error: Read-only file system
+############################
+pre-up wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf
 ```
-- 重启wifi  
+- 重启wlan0  
 ```sh
 sudo ifdown wlan0 && sudo ifup -v wlan0
 ```
