@@ -16,6 +16,7 @@
   command + f : 查找  
   fn + f11 : 快速切换到桌面  
   command + m : 最小化当前程序
+  command + option + escape: 打开强制退出应用程序窗口
 
 2. 截图  
   command + shift + 4 : 截取所选屏幕区域到一个文件  
