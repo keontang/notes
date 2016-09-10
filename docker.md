@@ -1,6 +1,6 @@
 ######  
 docker-show-repo-tags.sh  
-
+```sh
 #!/bin/sh
 #
 # Simple script that will display docker repository tags.
@@ -19,3 +19,4 @@ done
 curl https://registry.hub.docker.com/v2/repositories/library/ubuntu/tags | python -mjson.tool
 
 install docker: curl -sSL https://get.docker.com/ | sh
+```
