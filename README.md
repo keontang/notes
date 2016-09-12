@@ -11,6 +11,7 @@ something important
 - [vagrant](vagrant.md)
 - [haproxy](haproxy.md)
 - [mac pro](mac.md)
+- [golang](golang.md)
 
 #### ansible
 
