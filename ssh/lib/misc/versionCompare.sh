@@ -29,7 +29,8 @@
 #   2: version_1 < version_2
 function version_compare () {
     if [[ $1 == $2 ]]; then
-        return 0
+        echo "0"
+        return
     fi
 
     local IFS=.
@@ -48,15 +49,17 @@ function version_compare () {
 
         # version_1 > version_2
         if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 1
+            echo "1"
+            return
         fi
 
         # version_1 < version_2
         if ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 2
+            echo "2"
+            return
         fi
     done
 
     # version_1 == version_2
-    return 0
+    echo "0"
 }
