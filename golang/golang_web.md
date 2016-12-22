@@ -467,7 +467,7 @@ type WebService struct {
 
 每次把 router 注册(对应的路由及函数)到 webservice 中后，还要通过 container.Add(ws)将这一类的 webservice 加入到对应的 container 当中。
 
-在 add 方法中，会对 container 中的 serverMux 进行处理(就是按照上面介绍的 根据 HandFunc 往进去注册一些路由和方法的映射关系)调用上面所介绍的 ServeMux.HandleFunc 方法，将对应的 pattern 注册给 serverMux，container 对路由信息进行一些处理之后，serverMux 就只进行第一层的请求分发：c.ServeMux.HandleFunc(pattern+"/", c.dispatch)，第二层的请求分发由 c.dispatch 函数来完成。这个函数主要是将过来的子类别的请求再次分发给对应的 route 来处理，默认情况下，会按照 jsr311 的标准，选择出对应的 webservice 中的对应的路由，并且执行路由的对应方法。此外，还会处理 filter 函数并且进行一些额外操作，具体可参考源码。
+在 add 方法中，会对 container 中的 serverMux 进行处理(就是按照上面介绍的 根据 HandFunc 往进去注册一些路由和方法的映射关系)调用上面所介绍的 ServeMux.HandleFunc 方法，将对应的 pattern 注册给 serverMux. 而 Container 中 serverMux 的 handler 只有 dispatch，说明 container 包装的入口函数就是 dispatch, 即所以 webservice 过来的请求通过 serverMux 转发给 c.dispatch 函数来完成。这个函数会根据请求寻找对应的 route ，然后执行 route 对应的函数，默认情况下，会按照 jsr311 的标准，选择出对应的 webservice 中的对应的路由，并且执行路由的对应方法。此外，还会处理 filter 函数并且进行一些额外操作，具体可参考源码。
 
 go-restful 还支持对每一层对象添加对应的fliter方法，用于对方法进行一层封装，用于进行 pre function 以及 after function 操作，使用起来也很简单，比如像下面这个例子：
 
@@ -867,11 +867,366 @@ func main() {
     C 如果没有路由满足，调用NotFoundHandler的ServeHttp
 ```
 
+## go-restful 重要概念总结
+
+### Route
+
+路由包含两种，一种是标准 JSR311 接口规范的实现 RouterJSR311，一种是快速路由 CurlyRouter。CurlyRouter 支持正则表达式和动态参数，相比 RouterJSR311 更加轻量级，apiserver 中使用的就是这种路由。
+
+一条 Route 的设定包含：请求方法(Http Method)，请求路径(URL Path)，处理方法以及可选的接受内容类型(Content-Type)，响应内容类型(Accept)等。
+
+### WebService
+
+WebService 逻辑上是 Route 的集合，功能上主要是为一组 Route 统一设置包括 root path，请求响应的数据类型等一些通用的属性。需要注意的是，WebService 必须加入到 Container 中才能生效。
+
+```
+func InstallVersionHandler(mux Mux, container *restful.Container) {
+    // Set up a service to return the git code version.
+    versionWS := new(restful.WebService)
+
+    versionWS.Path("/version")
+    versionWS.Doc("git code version from which this is built")
+    versionWS.Route(
+        versionWS.GET("/").To(handleVersion).
+            Doc("get the code version").
+            Operation("getCodeVersion").
+            Produces(restful.MIME_JSON).
+            Consumes(restful.MIME_JSON).
+            Writes(version.Info{}))
+    container.Add(versionWS)
+}
+```
+
+### Container
+
+Container 逻辑上是 WebService 的集合，功能上可以实现多终端的效果。例如，下面代码中创建了两个 Container，分别在不同的 port 上提供服务。
+
+```
+func main() {
+    ws := new(restful.WebService)
+    ws.Route(ws.GET("/hello").To(hello))
+    // ws被添加到默认的container restful.DefaultContainer中
+    restful.Add(ws)
+    go func() {
+      // restful.DefaultContainer 监听在端口8080上
+        http.ListenAndServe(":8080", nil)
+    }()
+
+    container2 := restful.NewContainer()
+    ws2 := new(restful.WebService)
+    ws2.Route(ws2.GET("/hello").To(hello2))
+    // ws2被添加到container container2中
+    container2.Add(ws2)
+    // container2中监听在端口8081上
+    server := &http.Server{Addr: ":8081", Handler: container2}
+    log.Fatal(server.ListenAndServe())
+}
+
+func hello(req *restful.Request, resp *restful.Response) {
+    io.WriteString(resp, "default world")
+}
+
+func hello2(req *restful.Request, resp *restful.Response) {
+    io.WriteString(resp, "second world")
+}
+```
+
+### Filter
+
+Filter 用于动态的拦截请求和响应，类似于放置在相应组件前的钩子，在相应组件功能运行前捕获请求或者响应，主要用于记录 log，验证，重定向等功能。go-restful 中有三种类型的 Filter.
+
+#### Container Filter
+
+运行在 Container 中所有的 WebService 执行之前。
+
+```
+// install a (global) filter for the default container (processed before any webservice)
+restful.Filter(globalLogging)
+```
+
+#### WebService Filter
+
+运行在WebService中所有的Route执行之前。
+
+```
+// install a webservice filter (processed before any route)
+ws.Filter(webserviceLogging).Filter(measureTime)
+```
+
+#### Route Filter
+
+运行在调用Route绑定的方法之前。
+
+```
+// install 2 chained route filters (processed before calling findUser)
+ws.Route(ws.GET("/{user-id}").Filter(routeLogging).Filter(NewCountFilter().routeCounter).To(findUser))
+```
+
+## 使用样例
+
+下面代码是官方提供的例子。
+
+```
+package main
+
+import (
+    "github.com/emicklei/go-restful"
+    "log"
+    "net/http"
+)
+
+type User struct {
+    Id, Name string
+}
+
+type UserResource struct {
+    // normally one would use DAO (data access object)
+    users map[string]User
+}
+
+func (u UserResource) Register(container *restful.Container) {
+    // 创建新的WebService
+    ws := new(restful.WebService)
+  
+    // 设定WebService对应的路径("/users")和支持的MIME类型(restful.MIME_XML/ restful.MIME_JSON)
+    ws.
+        Path("/users").
+        Consumes(restful.MIME_XML, restful.MIME_JSON).
+        Produces(restful.MIME_JSON, restful.MIME_XML) // you can specify this per route as well
+
+    // 添加路由： GET /{user-id} --> u.findUser
+    ws.Route(ws.GET("/{user-id}").To(u.findUser))
+  
+    // 添加路由： POST / --> u.updateUser
+    ws.Route(ws.POST("").To(u.updateUser))
+  
+    // 添加路由： PUT /{user-id} --> u.createUser
+    ws.Route(ws.PUT("/{user-id}").To(u.createUser))
+  
+    // 添加路由： DELETE /{user-id} --> u.removeUser
+    ws.Route(ws.DELETE("/{user-id}").To(u.removeUser))
+
+    // 将初始化好的WebService添加到Container中
+    container.Add(ws)
+}
+
+// GET http://localhost:8080/users/1
+//
+func (u UserResource) findUser(request *restful.Request, response *restful.Response) {
+    id := request.PathParameter("user-id")
+    usr := u.users[id]
+    if len(usr.Id) == 0 {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "User could not be found.")
+    } else {
+        response.WriteEntity(usr)
+    }
+}
+
+// POST http://localhost:8080/users
+// <User><Id>1</Id><Name>Melissa Raspberry</Name></User>
+//
+func (u *UserResource) updateUser(request *restful.Request, response *restful.Response) {
+    usr := new(User)
+    err := request.ReadEntity(&usr)
+    if err == nil {
+        u.users[usr.Id] = *usr
+        response.WriteEntity(usr)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusInternalServerError, err.Error())
+    }
+}
+
+// PUT http://localhost:8080/users/1
+// <User><Id>1</Id><Name>Melissa</Name></User>
+//
+func (u *UserResource) createUser(request *restful.Request, response *restful.Response) {
+    usr := User{Id: request.PathParameter("user-id")}
+    err := request.ReadEntity(&usr)
+    if err == nil {
+        u.users[usr.Id] = usr
+        response.WriteHeader(http.StatusCreated)
+        response.WriteEntity(usr)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusInternalServerError, err.Error())
+    }
+}
+
+// DELETE http://localhost:8080/users/1
+//
+func (u *UserResource) removeUser(request *restful.Request, response *restful.Response) {
+    id := request.PathParameter("user-id")
+    delete(u.users, id)
+}
+
+func main() {
+    // 创建一个空的Container
+    wsContainer := restful.NewContainer()
+  
+    // 设定路由为CurlyRouter
+    wsContainer.Router(restful.CurlyRouter{})
+  
+    // 创建自定义的Resource Handle(此处为UserResource)
+    u := UserResource{map[string]User{}}
+  
+    // 创建WebService，并将WebService加入到Container中
+    u.Register(wsContainer)
+
+    log.Printf("start listening on localhost:8080")
+    server := &http.Server{Addr: ":8080", Handler: wsContainer}
+    
+    // 启动服务
+    log.Fatal(server.ListenAndServe())
+}
+```
+
+上面的示例构建 Restful 服务，分为几个步骤，apiserver 中也是类似的:
+
+1. 创建 Container。
+2. 创建自定义的 Resource Handle，实现 Resource 相关的处理方法。
+3. 创建对应于 Resource 的 WebService，在 WebService 中添加相应 Route，并将 WebService 加入到 Container 中。
+4. 启动监听服务。
+
+## http.ServeMux 源码剖析
+
+### web server 概述
+
+使用 go 语言搭建一个 web 服务器是很简单的，几行代码就可以搭建一个稳定的高并发的 web server。
+
+```
+// hello world, the web server
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+    io.WriteString(w, "hello, world!\n")
+}
+func main() {
+    http.HandleFunc("/hello/", HelloServer)
+    err := http.ListenAndServe(":8080", nil)
+    if err != nil {
+        log.Fatal("ListenAndServe: ", err)
+    }
+}
+```
+
+一个 go web 服务器正常运行起来大概需要以下几个步骤： 
+
+- 创建 listen socket，循环监听 listen socke 
+- accept 接受新的链接请求，并创建网络连接 conn，然后开启一个 goroutine 负责处理该链接。 
+- 从该链接读取请求参数构造出 http.Request 对象，然后根据请求路径在路由表中查找，找到对应的上层应用的处理函数，把请求交给应用处理函数。 
+- 应用处理函数根据请求的参数等信息做处理，返回不同的信息给用户 
+- 应用层处理完该链接请求后关闭该链接(正常流程，如果是 http alive 则不关闭该链接)
+
+这里面路由表是比较重要的，我们具体分析下 http.Server 是如何做路由的。 
+路由表实际上是一个 map 
+key 是路径 ==> “/hello” 
+value 是该路径所对应的处理函数 ==> HelloServer
+
+### 路由表结构
+
+go语言默认的路由表是 ServeMux，结构如下
+
+```
+type ServeMux struct {
+    mu    sync.RWMutex
+    m     map[string]muxEntry //存放具体的路由信息 
+}
+type muxEntry struct {
+    explicit bool
+    h        Handler
+    pattern  string
+}
+//muxEntry.Handler是一个接口
+type Handler interface {
+    ServeHTTP(ResponseWriter, *Request)
+}
+//这边可能会有疑惑 
+//http.HandleFunc("/hello/", HelloServer)
+//helloServer是一个function啊，并没有实现ServeHTTP接口啊
+//这是因为虽然我们传入的是一个function，但是HandleFunc会把function转为实现了ServeHTTP接口的一个新类型 HandlerFunc。
+/*
+func (mux *ServeMux) HandleFunc(pattern string, handler     func(ResponseWriter, *Request)) {
+    mux.Handle(pattern, HandlerFunc(handler))
+}
+type HandlerFunc func(ResponseWriter, *Request)
+// ServeHTTP calls f(w, r).
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+    f(w, r)
+}
+*/
+```
+
+### 路由注册过程
+
+注册过程其实就是往 map 中插入数据，**值得注意的一个地方是如果 
+注册路径是 /tree/ 并且没有 /tree的路由信息，那么会在路由表中自动增加一条 /tree 的路由，/tree 的处理函数是重定向到 /tree/。但是如果注册的是 /tree 是不会自动添加 /tree/ 的路由的.**
+
+```
+// Handle registers the handler for the given pattern.
+// If a handler already exists for pattern, Handle panics.
+func (mux *ServeMux) Handle(pattern string, handler Handler) {
+    mux.mu.Lock()
+    defer mux.mu.Unlock()
+    mux.m[pattern] = muxEntry{explicit: true, h: handler, pattern: pattern}
+    n := len(pattern)
+    if n > 0 && pattern[n-1] == '/' && !mux.m[pattern[0:n-1]].explicit {
+        path := pattern
+        fmt.Printf("redirect for :%s to :%s", pattern, path)
+        mux.m[pattern[0:n-1]] = muxEntry{h: RedirectHandler(path, StatusMovedPermanently), pattern: pattern}
+    }
+}
+```
+
+### 路由查找过程
+
+路由查找过程就是遍历路由表，找到最长匹配请求路径的路由信息并返回，如果找不到返回 NotFoundHandler
+
+```
+func (mux *ServeMux) handler(host, path string) (h Handler, pattern string) {
+    mux.mu.RLock()
+    defer mux.mu.RUnlock()
+    if h == nil {
+        h, pattern = mux.match(path)
+    }
+    if h == nil {
+        h, pattern = NotFoundHandler(), ""
+    }
+    return
+}
+func (mux *ServeMux) match(path string) (h Handler, pattern string) {
+    var n = 0
+    for k, v := range mux.m {
+        if !pathMatch(k, path) {
+            continue
+        }
+        //找出匹配度最长的
+        if h == nil || len(k) > n {
+            n = len(k)
+            h = v.h
+            pattern = v.pattern
+        }
+    }
+    return
+}
+// 如果路由表中的路径是不以 '/' 结尾的: /hello
+// 那么只有请求路径为 '/hello' 完全匹配时才符合
+// 如果路由表中的注册路径是以 '/' 结尾的: /hello/
+// 那么请求路径只要满足 '/hello/*' 就符合该路由
+func pathMatch(pattern, path string) bool {
+    n := len(pattern)
+    if pattern[n-1] != '/' {
+        return pattern == path
+    }
+    return len(path) >= n && path[0:n] == pattern
+}
+```
+
 # References
 
 1. [http://wangzhezhe.github.io/blog/2015/09/14/servmux/](http://wangzhezhe.github.io/blog/2015/09/14/servmux/)
 2. [http://www.chingli.com/coding/understanding-go-web-app/](http://www.chingli.com/coding/understanding-go-web-app/)
 3. [http://www.cnblogs.com/yjf512/archive/2012/08/22/2650873.html](http://www.cnblogs.com/yjf512/archive/2012/08/22/2650873.html)
+4. [http://www.cnblogs.com/ldaniel/p/5868384.html?utm_source=itdadao&utm_medium=referral](http://www.cnblogs.com/ldaniel/p/5868384.html?utm_source=itdadao&utm_medium=referral)
 
 
 
