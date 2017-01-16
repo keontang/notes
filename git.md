@@ -69,6 +69,12 @@ git config --global core.editor vim
     git merge repo_name/branch_name
     git rebase repo_name/branch_name //或者
 
+- 获取远程仓库指定 tag
+
+---
+    git fetch <repo_name> refs/tags/tag_name:refs/tags/tag_name
+    git checkout tags/tag_name -b new_branch_name
+
 ### git pull
 - 取回远程主机某个分支的更新，再与本地的指定分支合并
 

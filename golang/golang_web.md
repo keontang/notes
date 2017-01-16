@@ -1227,6 +1227,7 @@ func pathMatch(pattern, path string) bool {
 2. [http://www.chingli.com/coding/understanding-go-web-app/](http://www.chingli.com/coding/understanding-go-web-app/)
 3. [http://www.cnblogs.com/yjf512/archive/2012/08/22/2650873.html](http://www.cnblogs.com/yjf512/archive/2012/08/22/2650873.html)
 4. [http://www.cnblogs.com/ldaniel/p/5868384.html?utm_source=itdadao&utm_medium=referral](http://www.cnblogs.com/ldaniel/p/5868384.html?utm_source=itdadao&utm_medium=referral)
+5. [http://shanks.leanote.com/post/http.ServeMux%E8%A7%A3%E6%9E%90](http://shanks.leanote.com/post/http.ServeMux%E8%A7%A3%E6%9E%90)
 
 
 
